@@ -1,43 +1,54 @@
-package com.fireloc.fireloc.network // Make sure package name is correct
+package com.fireloc.fireloc.network // Ensure this package name is correct
 
-/**
- * Data class for the request body of the /registerDevice endpoint.
- */
+import com.google.gson.annotations.SerializedName
+
+// --- Request Bodies ---
+
+// For POST /registerDevice
 data class DeviceRegistrationRequest(
-    val deviceId: String,
-    val deviceName: String? // Optional user-friendly name
+    @SerializedName("deviceId") val deviceId: String,
+    @SerializedName("deviceName") val deviceName: String? = null // Optional device name
 )
 
-/**
- * Data class for the success response body of the /registerDevice endpoint.
- */
-data class DeviceRegistrationResponse(
-    val status: String, // e.g., "success"
-    val message: String // e.g., "Device registered successfully."
-)
-
-// TODO: Add data classes for /detect endpoint later
-/*
-data class LocationData(val latitude: Double, val longitude: Double) // Changed to Double
-
+// For POST /detect
 data class DetectRequest(
-    val deviceId: String,
-    val image_base64: String,
-    val timestamp_ms: Long, // Changed to Long
-    val location: LocationData,
-    val mobile_detected: Boolean
+    @SerializedName("deviceId") val deviceId: String,
+    @SerializedName("image_base64") val imageBase64: String, // Matching your original naming
+    @SerializedName("timestamp_ms") val timestampMs: Long,   // Matching your original naming
+    @SerializedName("location") val location: LocationData?, // Use the LocationData class below
+    @SerializedName("mobile_detected") val mobileDetected: Boolean // Matching your original naming
 )
 
-data class DetectionResult(
-    val class_id: Int,
-    val confidence: Float, // Changed to Float
-    val box_normalized: List<Float> // Changed to List<Float>
+// --- Response Bodies ---
+
+// For POST /registerDevice **** ADDED THIS CLASS ****
+data class DeviceRegistrationResponse(
+    @SerializedName("status") val status: String, // e.g., "success", "error"
+    @SerializedName("message") val message: String? // Optional confirmation or error message
 )
 
+// For POST /detect
 data class DetectResponse(
-    val status: String?, // Make nullable for error cases?
-    val detected: Boolean?, // Make nullable for error cases?
-    val results: List<DetectionResult>?, // Make nullable for error cases?
-    val error: String? // Field for error message
+    @SerializedName("status") val status: String?,
+    @SerializedName("detected") val detected: Boolean?,
+    @SerializedName("results") val results: List<DetectionResult>?,
+    // Using "message" for consistency with DeviceRegistrationResponse, but keeping "error" if backend uses it
+    @SerializedName("message") val message: String?,
+    @SerializedName("error") val error: String? // Keep if backend might return 'error' field
 )
-*/
+
+// --- Nested Data Classes ---
+
+// Used within DetectRequest
+data class LocationData(
+    @SerializedName("latitude") val latitude: Double,
+    @SerializedName("longitude") val longitude: Double,
+    @SerializedName("accuracy") val accuracy: Float? = null // Optional accuracy in meters
+)
+
+// Used within DetectResponse (represents one detected object by cloud)
+data class DetectionResult(
+    @SerializedName("class_id") val classId: Int, // Matching your original naming
+    @SerializedName("confidence") val confidence: Float,
+    @SerializedName("box_normalized") val boxNormalized: List<Float> // [l,t,r,b] matching your original naming
+)

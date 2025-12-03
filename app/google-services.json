@@ -7,12 +7,20 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:498459726219:android:1dff506e912dd6a6b01f8e",
+        "mobilesdk_app_id": "1:498459726219:android:f5c44cf65eb1337db01f8e",
         "android_client_info": {
-          "package_name": "com.FireLoc.Fireloc"
+          "package_name": "com.fireloc.fireloc"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "498459726219-l9gd9dvi428js0osdnm31iqovet3htdn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fireloc.fireloc",
+            "certificate_hash": "561f6f5e7378ab1ffaecd6846c6e68124e001523"
+          }
+        },
         {
           "client_id": "498459726219-4n5v3ahpg384akn80kf9pvh1tha7drps.apps.googleusercontent.com",
           "client_type": 3

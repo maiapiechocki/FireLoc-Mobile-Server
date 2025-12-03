@@ -1,31 +1,28 @@
-package com.fireloc.fireloc.network // Make sure package name is correct
+package com.fireloc.fireloc.network // Ensure this package name is correct
 
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.Url
 
-/**
- * Defines the API endpoints for communication with the FireLoc backend.
- */
 interface ApiService {
 
-    /**
-     * Registers a device with the backend.
-     * Requires Firebase ID Token for user authentication.
-     */
-    @POST("/registerDevice") // Use the actual endpoint path provided by Arjun
+    // Device Registration
+    @POST
     suspend fun registerDevice(
-        @Header("Authorization") bearerToken: String, // e.g., "Bearer <FIREBASE_ID_TOKEN>"
+        @Url url: String, // Full URL for registration
+        @Header("Authorization") authToken: String, // User ID Token
         @Body registrationData: DeviceRegistrationRequest
-    ): Response<DeviceRegistrationResponse> // Using Response allows checking success/error codes
+    ): Response<DeviceRegistrationResponse> // **** CORRECT RESPONSE TYPE ****
 
-    // TODO: Add the /detect endpoint definition later
-    /*
-    @POST("/detect")
-    suspend fun detectFire(
-         // @Header("X-Firebase-AppCheck") appCheckToken: String, // App Check token might be added automatically by SDKs or needed manually
-         @Body detectRequest: DetectRequest
+    // Detection Endpoint
+    @POST
+    suspend fun detect(
+        @Url url: String, // Full URL for detection
+        @Header("Authorization") authToken: String, // User ID Token
+        @Header("X-Firebase-AppCheck") appCheckToken: String, // App Check Token
+        @Body detectRequestData: DetectRequest
     ): Response<DetectResponse>
-    */
+
 }

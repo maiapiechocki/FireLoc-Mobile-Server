@@ -2,60 +2,68 @@
 
 [versions]
 # Android Build & Base
-# Removed compileSdk, minSdk, targetSdk as they are likely set directly in app/build.gradle.kts
-agp = "8.4.2" # Kept your version
-kotlin = "2.0.21" # Kept your version
+agp = "8.4.2" # Keeping this version
+kotlin = "2.0.21" # Keeping this version
+compileSdk = "34" # Keeping this version
+minSdk = "26"
+targetSdk = "34" # Keeping this version
+playServicesLocation = "21.3.0" # Check for the latest version
 
-# AndroidX Core & UI (Updated based on warnings)
-coreKtx = "1.16.0" # Kept your version (assuming it's intentional, or update if needed)
-appcompat = "1.7.0" # Kept your version
-constraintlayout = "2.2.1" # Kept your version
-activityKtx = "1.10.1" # Updated from 1.9.1 based on warning
-lifecycleRuntimeKtx = "2.8.7" # Kept your version
 
-# CameraX (Updated based on warnings)
-camerax = "1.4.2" # Updated from 1.3.4 based on warnings
+# AndroidX Core & UI
+# *** VERSION DOWNGRADED AGAIN ***
+coreKtx = "1.13.1"  # Downgraded further (compatible with compileSdk 34 & AGP 8.4.2)
+appcompat = "1.7.0"
+constraintlayout = "2.2.1"
+# Keeping downgraded activity version
+activityKtx = "1.9.0"
+lifecycleRuntimeKtx = "2.8.7"
 
-# Firebase (Updated based on warnings)
-firebaseBom = "33.12.0" # Updated from 33.2.0 based on warning
+# CameraX (Use a consistent version)
+camerax = "1.3.4" # Keeping this version
+
+# Firebase
+firebaseBom = "33.2.0" # Keeping this version
 # Versions for auth, firestore, functions etc. are managed by the BOM
 
-# Google Play Services (Updated based on warnings)
-playServicesAuth = "21.3.0" # Updated from 21.2.0 based on warning
+# Google Play Services (for Sign-In)
+playServicesAuth = "21.2.0" # Keeping this version
 
 # Networking
-retrofit = "2.11.0" # Kept your version
+retrofit = "2.11.0"
 converterGson = "2.11.0" # Match retrofit version
-loggingInterceptor = "4.12.0" # Kept your version
+loggingInterceptor = "4.12.0" # OkHttp3 logging
 
 # Coroutines
-kotlinxCoroutines = "1.8.1" # Kept your version
+kotlinxCoroutines = "1.8.1"
 
 # ONNX Runtime
-onnxruntime = "1.18.0" # Kept your version
+onnxruntime = "1.18.0" # Keeping this version
 
 # Testing
 junit = "4.13.2"
 androidxJunit = "1.2.1"
 espressoCore = "3.6.1"
 
-# Plugins
-googleGmsServicesPlugin = "4.4.2" # Kept your version
+# Plugins (matching versions applied in settings.gradle.kts or app/build.gradle.kts)
+googleGmsServicesPlugin = "4.4.2"
 
-# Compose (if used)
+# Compose (if used - keep versions consistent)
 # composeBom = "2024.06.00"
 # activityCompose = "1.9.0"
-# composeCompiler = "1.5.10"
+# composeCompiler = "1.5.10" # Match your Kotlin version if needed
 
 [libraries]
 # AndroidX Core & UI
+# Uses the further downgraded coreKtx version ref
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+# Uses the downgraded activityKtx version ref
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx"}
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 
-# CameraX - Ensure all use the updated 'camerax' version ref
+# CameraX
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
@@ -64,9 +72,8 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 # Firebase
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx" } # Version from BOM
-# Commented out unused aliases:
-# firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
-# firebase-functions-ktx = { group = "com.google.firebase", name = "firebase-functions-ktx" }
+firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx" } # Version from BOM (Add if needed)
+firebase-functions-ktx = { group = "com.google.firebase", name = "firebase-functions-ktx" } # Version from BOM (Add if needed)
 
 # Google Play Services
 play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
@@ -88,7 +95,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 
-# Compose UI (Keep commented if not needed)
+# Compose UI (Uncomment if needed)
 # androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 # androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 # androidx-ui = { group = "androidx.compose.ui", name = "ui" }
@@ -99,10 +106,12 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 # androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 # androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 googleGmsServices = { id = "com.google.gms.google-services", version.ref = "googleGmsServicesPlugin" }
-# kotlinCompose = { id = "org.jetbrains.kotlin.compose", version.ref = "kotlin" }
-# composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "composeCompiler" }
+# kotlinCompose = { id = "org.jetbrains.kotlin.compose", version.ref = "kotlin" } # If using Compose Compiler plugin
+# Compose Compiler plugin needs specific version matching Kotlin sometimes:
+# composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "composeCompiler" } # Or use kotlin version ref

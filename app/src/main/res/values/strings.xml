@@ -1,53 +1,65 @@
 <resources>
     <string name="app_name">FireLoc</string>
 
-    <!-- UI & Status -->
+    <!-- Status Messages -->
     <string name="initializing">Initializing…</string>
-    <string name="layout_error_toast">Layout View ID error</string>
-    <string name="initializing_camera">Initializing Camera…</string>
+    <string name="signed_out">Signed Out</string> <!-- Simplified from prev -->
+    <string name="signed_in_fmt">Signed In: %1$s</string> <!-- %1$s placeholder for email -->
+    <string name="signing_in">Signing In…</string>
+    <string name="sign_in_failed">Sign In Failed</string>
+    <string name="sign_in_failed_reason_fmt">Sign-In Failed (%1$s)</string> <!-- %1$s placeholder for reason -->
+    <string name="sign_in_failed_api_fmt">Sign-In Failed (API Exception: %1$d)</string> <!-- %1$d placeholder for code -->
+    <string name="sign_in_failed_result_fmt">Sign-In Failed (Result Code: %1$d)</string> <!-- %1$d placeholder for code -->
+    <string name="sign_in_failed_firebase_auth">Sign-In Failed (Firebase Auth Error)</string>
+    <string name="authenticating_firebase">Authenticating with Firebase…</string>
+    <string name="permissions_required">Required permissions denied. App cannot function.</string>
     <string name="scanning_status">Scanning…</string>
-    <string name="scanning_status_with_time">Scanning… (%1$dms)</string>
     <string name="camera_error">Camera Error</string>
-    <string name="camera_start_error_toast">Error starting camera: %1$s</string>
-    <string name="detection_status_format">DETECTED: %1$d fire, %2$d smoke (%3$d%% conf)</string>
-    <string name="waiting_for_layout">Waiting for layout…</string>
+    <string name="camera_error_detail_fmt">Camera Error: %1$s</string> <!-- %1$s placeholder for exception message -->
+    <string name="token_error">Failed to get authentication token.</string>
+    <string name="registering_device">Registering Device…</string>
+    <string name="registration_failed">Device Registration Failed</string>
+    <string name="registration_failed_code_fmt">Registration failed: %1$d</string> <!-- %1$d placeholder for code -->
+    <string name="registration_error_fmt">Registration Error: %1$s</string> <!-- %1$s placeholder for exception message -->
+    <string name="registration_network_error">Registration Network/Process Error</string>
+    <string name="device_registered">Device Registered!</string>
+    <string name="device_already_registered">Device already registered.</string>
+    <string name="sign_in_required">Sign in required.</string>
+    <string name="location_permission_needed">Location permission needed.</string>
+    <string name="getting_data_for_cloud">Getting data for cloud…</string>
+    <string name="getting_auth_token">Getting Auth Token…</string>
+    <string name="getting_app_check_token">Getting App Check Token…</string>
+    <string name="getting_location">Getting Location…</string>
+    <string name="preparing_image">Preparing image…</string>
+    <string name="sending_to_cloud">Sending to cloud…</string>
+    <string name="cloud_status_fmt">Cloud: %1$s%2$s</string> <!-- %1$s=status, %2$s=confirmation -->
+    <string name="cloud_confirmed"> - Confirmed</string>
+    <string name="cloud_not_confirmed"> - Not Confirmed</string>
+    <string name="cloud_processed">Processed</string>
+    <string name="cloud_detect_failed_code_fmt">Cloud Detect Failed (%1$d)</string> <!-- %1$d=code -->
+    <string name="cloud_error_code_fmt">Cloud Error: %1$d</string> <!-- %1$d=code -->
+    <string name="cloud_process_error">Cloud Process Error</string>
+    <string name="cloud_process_error_detail_fmt">Cloud Process Error: %1$s</string> <!-- %1$s=message -->
+    <string name="app_check_failed_error">Error: App Check Failed</string>
+    <string name="app_check_failed_toast">App Check failed. Ensure Play Services are updated.</string>
+    <string name="auth_token_error">Auth Token Error</string>
+    <string name="scanning_status_time_fmt">%1$s (%2$dms)</string> <!-- %1$s=scanning, %2$d=time -->
+    <string name="local_detection_status_fmt" translatable="false">Local: F:%1$d S:%2$d C:%3$d%%</string> <!-- F=fire, S=smoke, C=confidence -->
+    <string name="device_not_registered">Device not registered.</string> <!-- Missing string -->
 
-    <!-- Permissions -->
-    <string name="camera_permission_denied_toast">Camera permission request denied.</string>
-    <string name="camera_permission_required">Camera permission required</string>
-    <string name="permissions_required">Permissions Required</string>
 
-    <!-- Authentication -->
-    <string name="sign_out_button">Sign Out</string>
-    <string name="status_signed_in">Signed In: %1$s</string>
-    <string name="status_signed_out">Signed Out. Please Sign In.</string>
-    <string name="error_signin_setup">Sign-In not configured correctly.</string>
-    <string name="error_firebase_auth_failed">Firebase Authentication Failed</string>
-    <string name="signed_out_toast">Signed Out</string>
-    <string name="google_signin_failed_or_cancelled">Google Sign-In Failed or Cancelled</string>
+    <!-- Button Labels -->
+    <string name="sign_in">Sign In with Google</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="register_device">Register This Device</string>
 
-    <!-- Device Registration -->
-    <string name="register_device_button">Register This Device</string>
-    <string name="signin_required_to_register">Please sign in first to register device.</string>
-    <string name="registering_device_toast">Registering device…</string>
-    <string name="error_getting_token">Error getting authentication token.</string>
-    <string name="registration_success_toast">Device Registered Successfully!</string>
-    <string name="registration_failed_toast">Registration Failed: %1$d %2$s</string> <!-- Args: code, message -->
-    <string name="error_device_id_missing">Error: Device ID not found.</string>
-    <string name="device_already_registered">Device is already registered.</string>
-
-    <!-- Network & General Errors -->
-    <string name="network_error_toast">Network Error: %1$s</string> <!-- Args: message -->
-    <string name="unknown_error">Unknown error</string>
-
-    <!-- Crucial: Replace with your actual Web Client ID -->
+    <!-- Web Client ID (Ensure this is correct!) -->
     <string name="default_web_client_id" translatable="false">498459726219-4n5v3ahpg384akn80kf9pvh1tha7drps.apps.googleusercontent.com</string>
 
-    <!-- Original Strings from Previous Context (ensure they are here if needed by other parts) -->
+    <!-- Other strings you had (potentially unused by MainActivity now, but kept) -->
     <string name="processing_previous">Processing previous image...</string>
     <string name="auto_mode_active">Auto mode active</string>
     <string name="ready">Ready</string>
-    <string name="camera_ready">Camera ready</string>
     <string name="capturing">Capturing...</string>
     <string name="capture_failed">Capture failed</string>
     <string name="photo_capture_failed">Photo capture failed: %1$s</string>
@@ -61,8 +73,13 @@
     <string name="processing_error">Processing error</string>
     <string name="error_format">Error: %1$s</string>
     <string name="location_format">Location: %1$s, %2$s</string>
-    <string name="error_initializing_camera">Error initializing camera</string>
-
-    <!-- REMOVED DUPLICATE BLOCK THAT WAS HERE -->
+    <string name="scanning">Scanning... (Proc: %1$dms)</string>
+    <string name="camera_permission_denied">Camera permission denied</string>
+    <string name="camera_ready">Camera ready</string> <!-- Kept from your list -->
+    <string name="error_initializing_camera">Error initializing camera</string> <!-- Kept from your list -->
+    <string name="detection_status_format">DETECTED: %1$d fire, %2$d smoke (%3$d%% confidence)</string> <!-- Kept from your list, might conflict with local_detection_status_fmt -->
+    <string name="device_registered_fmt">Device Registered (ID: %s)</string> <!-- Kept from your list -->
+    <string name="generating_device_id">Generating Device ID...</string> <!-- Kept from your list -->
+    <string name="getting_token">Getting ID Token...</string> <!-- Kept from your list -->
 
 </resources>

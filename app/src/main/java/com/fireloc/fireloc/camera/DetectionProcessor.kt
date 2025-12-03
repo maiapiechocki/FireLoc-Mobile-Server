@@ -4,192 +4,114 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.fireloc.fireloc.model.YoloModel
-import com.fireloc.fireloc.utils.ImageUtils
+import com.fireloc.fireloc.utils.ImageUtils // Ensure correct import
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Processes camera frames (ImageProxy) for fire/smoke detection using the YOLO model.
- */
 class DetectionProcessor(
     private val context: Context,
-    private val onDetectionResult: (List<Detection>, Int, Int) -> Unit // Callback with results AND image dimensions
+    // **** MODIFIED CALLBACK SIGNATURE ****
+    private val onPotentialDetection: (
+        detections: List<Detection>, // Local detections (normalized coords)
+        sourceBitmap: Bitmap?,      // Bitmap that triggered detection (null if no detection met criteria)
+        imageWidth: Int,            // Original image width
+        imageHeight: Int            // Original image height
+    ) -> Unit
 ) {
     companion object {
         private const val TAG = "FireLocDetectionProc"
-        // Keep threshold reasonable, adjust based on testing
-        private const val DETECTION_THRESHOLD = 0.40f // You can tune this (e.g., 0.40f - 0.55f)
+        private const val DETECTION_THRESHOLD = 0.40f // Local model threshold
     }
 
-    // Model for inference
-    private val model: YoloModel = YoloModel(context) // Assumes YoloModel loads 'best.onnx'
-
-    // Executor for running inference in the background
+    private val model: YoloModel = YoloModel(context)
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-
-    // Performance metrics & frame skipping
-    private var lastProcessingTimeMs: Long = 0
+    @Volatile private var lastProcessingTimeMs: Long = 0
     private var frameCounter = 0
-    // --- MODIFICATION: Increase frame skipping ---
-    // Process 1 out of every 5 frames (adjust as needed for your device speed)
-    // If inference takes ~200ms, processing 1/5 frames gives it ~333ms budget at 30fps
-    private val skipFrames = 4 // <<< INCREASED from 2 (means process 1 out of 5)
-    // --- END MODIFICATION ---
+    private val skipFrames = 4
+    private val isProcessing = AtomicBoolean(false)
 
-    /**
-     * Processes an ImageProxy from CameraX.
-     * Converts it to a Bitmap and passes it to the detection model.
-     * Runs detection on a background thread.
-     * MUST call imageProxy.close() when done.
-     */
-    @SuppressLint("UnsafeOptInUsageError") // Needed for ImageProxy.image
+    @SuppressLint("UnsafeOptInUsageError")
     fun processImageProxy(imageProxy: ImageProxy) {
         frameCounter++
-
-        // --- Frame Skipping Logic ---
         if (frameCounter % (skipFrames + 1) != 0) {
-            imageProxy.close() // IMPORTANT: Must close the ImageProxy you don't process
-            return
+            imageProxy.close(); return
         }
-        // --- End Frame Skipping ---
+        if (!isProcessing.compareAndSet(false, true)) {
+            imageProxy.close(); return
+        }
 
         val startTime = SystemClock.elapsedRealtime()
-
-        // Capture image dimensions *before* closing proxy
         val imageWidth = imageProxy.width
         val imageHeight = imageProxy.height
-        // Capture rotation degrees for coordinate transformation later
-        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
 
-        // --- Convert ImageProxy to Bitmap ---
-        // Pass rotationDegrees to ImageUtils if it uses it for intermediate steps,
-        // although the final rotation should happen based on the proxy info later.
-        // We primarily need the bitmap content correctly oriented *for the model*.
-        // ImageUtils already includes rotation based on imageProxy.imageInfo.rotationDegrees
+        // Convert to Bitmap now, before passing to background thread
         val bitmap = ImageUtils.imageProxyToBitmap(imageProxy)
-
-        // IMPORTANT: Close the ImageProxy AFTER converting to Bitmap or if conversion fails
-        imageProxy.close()
+        imageProxy.close() // Close proxy right after conversion
 
         if (bitmap == null) {
-            Log.e(TAG, "Failed to convert ImageProxy to bitmap")
-            // Optionally inform UI that processing failed for this frame
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                // Pass empty list and original image dimensions
-                onDetectionResult(emptyList(), imageWidth, imageHeight)
+            Log.e(TAG, "Failed to convert ImageProxy to bitmap for frame $frameCounter")
+            isProcessing.set(false)
+            // Post empty result (no bitmap)
+            Handler(Looper.getMainLooper()).post {
+                onPotentialDetection(emptyList(), null, imageWidth, imageHeight)
             }
-            return // Skip processing if conversion failed
+            return
         }
 
-        // --- Submit to Background Executor for Detection ---
         executor.execute {
             val inferenceStartTime = SystemClock.elapsedRealtime()
-            var detections: List<YoloModel.YoloDetection> = emptyList()
+            var localDetections: List<Detection> = emptyList()
+            var bitmapToPass: Bitmap? = null // Will hold bitmap only if needed
+
             try {
-                // Perform inference on the potentially rotated bitmap from ImageUtils
-                detections = model.detect(bitmap) // Model receives bitmap oriented for it
+                val yoloDetections = model.detect(bitmap)
+                localDetections = filterDetections(yoloDetections) // Filter local results
 
-                // Filter detections by confidence threshold
-                val filteredDetections = filterDetections(detections)
-
-                // Calculate processing time
                 val endTime = SystemClock.elapsedRealtime()
                 lastProcessingTimeMs = endTime - inferenceStartTime
-                val totalTime = endTime - startTime
+                // Optional: Log performance periodically
+                if (frameCounter % ((skipFrames + 1) * 3) == 0) { Log.d(TAG, "Frame ${frameCounter}: Found ${localDetections.size} local detections. Inference Time: $lastProcessingTimeMs ms.") }
 
-                // Log less frequently
-                if (frameCounter % 15 == 0) { // Log approx every half second
-                    Log.d(TAG, "Processed frame ${frameCounter}: " +
-                            "Found ${filteredDetections.size} detections. " +
-                            "Inference Time: $lastProcessingTimeMs ms. " +
-                            "Total Time: $totalTime ms.")
+                // **** Decide if bitmap needs to be passed to the callback ****
+                if (localDetections.isNotEmpty()) {
+                    bitmapToPass = bitmap // Keep reference to pass to MainActivity
+                    Log.d(TAG, "Local detection above threshold found. Passing bitmap.")
+                } else {
+                    // Bitmap not needed, consider recycling if safe
+                    // if (!bitmap.isRecycled) bitmap.recycle() // Use with caution
                 }
 
-                // Post results back to main thread
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    // Pass filtered detections AND the original image dimensions
-                    onDetectionResult(filteredDetections, imageWidth, imageHeight)
+                // Post results (detections and potentially the bitmap) to main thread
+                Handler(Looper.getMainLooper()).post {
+                    onPotentialDetection(localDetections, bitmapToPass, imageWidth, imageHeight)
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error during model detection/processing: ${e.message}")
-                e.printStackTrace()
-                // Post an empty result on error
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    onDetectionResult(emptyList(), imageWidth, imageHeight) // Pass empty list
+                Log.e(TAG, "Error during model detection/processing frame $frameCounter", e)
+                // Consider recycling bitmap on error if not passed
+                // if (bitmapToPass == null && !bitmap.isRecycled) bitmap.recycle()
+                Handler(Looper.getMainLooper()).post { // Post empty on error
+                    onPotentialDetection(emptyList(), null, imageWidth, imageHeight)
                 }
+            } finally {
+                isProcessing.set(false) // Release processing flag
             }
-            // Bitmap recycling is usually handled by GC
-            // finally { if (!bitmap.isRecycled) { bitmap.recycle() } }
         }
     }
 
-    /**
-     * Filters raw YOLO detections based on confidence and maps to our Detection data class.
-     * Returns Detection objects with NORMALIZED coordinates (0.0 - 1.0) relative
-     * to the input image dimensions used for inference (e.g., 640x640).
-     */
-    private fun filterDetections(rawDetections: List<YoloModel.YoloDetection>): List<Detection> {
-        val filtered = rawDetections
-            .filter { it.confidence >= DETECTION_THRESHOLD }
-            .mapNotNull { yoloDetection ->
-                // Basic sanity check on coordinates (should be 0.0-1.0 range relative to model input)
-                if (yoloDetection.left < 0.0f || yoloDetection.top < 0.0f ||
-                    yoloDetection.right > 1.0f || yoloDetection.bottom > 1.0f ||
-                    yoloDetection.left >= yoloDetection.right || yoloDetection.top >= yoloDetection.bottom) {
-                    Log.w(TAG, "Skipping detection with invalid normalized coords: $yoloDetection")
-                    null // Skip this detection
-                } else {
-                    // Map class ID (Verify your training: 0=smoke, 1=fire)
-                    val type = when (yoloDetection.classId) {
-                        1 -> FireDetectionType.FIRE
-                        0 -> FireDetectionType.SMOKE
-                        else -> {
-                            Log.w(TAG, "Skipping detection with unknown class ID: ${yoloDetection.classId}")
-                            null
-                        }
-                    }
+    // filterDetections remains the same...
+    private fun filterDetections(rawDetections: List<YoloModel.YoloDetection>): List<Detection> { /* ... unchanged ... */ return rawDetections.filter{it.confidence >= DETECTION_THRESHOLD}.mapNotNull{yoloDetection->val isValidBox=yoloDetection.left in 0.0f..1.0f&&yoloDetection.top in 0.0f..1.0f&&yoloDetection.right in 0.0f..1.0f&&yoloDetection.bottom in 0.0f..1.0f&&yoloDetection.left<yoloDetection.right&&yoloDetection.top<yoloDetection.bottom;if(!isValidBox){Log.w(TAG,"Skipping invalid norm coords: $yoloDetection");return@mapNotNull null};val type:FireDetectionType?=when(yoloDetection.classId){1->FireDetectionType.FIRE;0->FireDetectionType.SMOKE;else->null};type?.let{Detection(type=it,confidence=yoloDetection.confidence,boundingBox=RectF(yoloDetection.left,yoloDetection.top,yoloDetection.right,yoloDetection.bottom))}} }
 
-                    type?.let { // Only create Detection if type is valid
-                        Detection(
-                            type = it,
-                            confidence = yoloDetection.confidence,
-                            boundingBox = RectF( // Store NORMALIZED coords from model output
-                                yoloDetection.left,
-                                yoloDetection.top,
-                                yoloDetection.right,
-                                yoloDetection.bottom
-                            )
-                        )
-                    }
-                }
-            }
-        // NMS is handled within YoloModel.postProcessOutput
-        return filtered
-    }
+    // release remains the same...
+    fun release() { /* ... unchanged ... */ try { if (!executor.isShutdown) executor.shutdown(); model.close(); Log.d(TAG, "DetectionProcessor resources released.") } catch (e: Exception) { Log.e(TAG, "Error releasing DetectionProcessor resources: ${e.message}") } }
 
-
-    /**
-     * Releases resources held by the processor (model, executor).
-     */
-    fun release() {
-        try {
-            executor.shutdown()
-            model.close() // Ensure YoloModel's close is called
-            Log.d(TAG, "DetectionProcessor resources released.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing DetectionProcessor resources: ${e.message}")
-        }
-    }
-
-    /**
-     * Gets the last frame processing time (inference + post-processing) in milliseconds.
-     */
-    fun getLastProcessingTimeMs(): Long {
-        return lastProcessingTimeMs
-    }
+    // getLastProcessingTimeMs remains the same...
+    fun getLastProcessingTimeMs(): Long { /* ... unchanged ... */ return lastProcessingTimeMs }
 }

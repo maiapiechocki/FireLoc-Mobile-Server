@@ -10,7 +10,8 @@ function dot(a, b) {
 }
 
 // ---------------------------
-// Rotation Matrix from Yaw-Pitch-Roll (ZYX order)
+// Rotation Matrix
+// from Yaw-Pitch-Roll (ZYX order)
 // ---------------------------
 function getRotationMatrix([yaw, pitch, roll]) {
     const deg2rad = angle => (angle * Math.PI) / 180;
