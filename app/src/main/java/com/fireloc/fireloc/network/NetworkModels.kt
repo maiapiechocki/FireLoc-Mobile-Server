@@ -1,54 +1,74 @@
-package com.fireloc.fireloc.network // Ensure this package name is correct
+package com.fireloc.fireloc.network
 
 import com.google.gson.annotations.SerializedName
 
 // --- Request Bodies ---
 
-// For POST /registerDevice
 data class DeviceRegistrationRequest(
     @SerializedName("deviceId") val deviceId: String,
-    @SerializedName("deviceName") val deviceName: String? = null // Optional device name
+    @SerializedName("deviceName") val deviceName: String? = null
 )
 
-// For POST /detect
+/**
+ * Payload sent from the mobile device to the Firebase /detect cloud function.
+ * Matches the structure consumed by detect.js.
+ */
 data class DetectRequest(
     @SerializedName("deviceId") val deviceId: String,
-    @SerializedName("image_base64") val imageBase64: String, // Matching your original naming
-    @SerializedName("timestamp_ms") val timestampMs: Long,   // Matching your original naming
-    @SerializedName("location") val location: LocationData?, // Use the LocationData class below
-    @SerializedName("mobile_detected") val mobileDetected: Boolean // Matching your original naming
+    // The image must be non-null and encoded.
+    @SerializedName("image_base64") val imageBase64: String,
+    @SerializedName("timestamp_ms") val timestampMs: Long,
+    // LocationData must be provided for localization.
+    @SerializedName("location") val location: LocationData,
+    @SerializedName("mobile_detected") val mobileDetected: Boolean
 )
 
 // --- Response Bodies ---
 
-// For POST /registerDevice **** ADDED THIS CLASS ****
 data class DeviceRegistrationResponse(
-    @SerializedName("status") val status: String, // e.g., "success", "error"
-    @SerializedName("message") val message: String? // Optional confirmation or error message
+    @SerializedName("status") val status: String,
+    @SerializedName("message") val message: String?
 )
 
-// For POST /detect
 data class DetectResponse(
     @SerializedName("status") val status: String?,
     @SerializedName("detected") val detected: Boolean?,
     @SerializedName("results") val results: List<DetectionResult>?,
-    // Using "message" for consistency with DeviceRegistrationResponse, but keeping "error" if backend uses it
     @SerializedName("message") val message: String?,
-    @SerializedName("error") val error: String? // Keep if backend might return 'error' field
+    @SerializedName("error") val error: String?
 )
 
 // --- Nested Data Classes ---
 
-// Used within DetectRequest
+/**
+ * Contains all the GPS, altitude, and camera orientation data required by the
+ * backend (fireTri.js) for ray-casting localization.
+ */
 data class LocationData(
+    // GPS Latitude and Longitude are mandatory for any location request.
     @SerializedName("latitude") val latitude: Double,
     @SerializedName("longitude") val longitude: Double,
-    @SerializedName("accuracy") val accuracy: Float? = null // Optional accuracy in meters
+
+    // Altitude, Heading, Pitch, and FOV are collected by SensorFusionManager and CameraManager
+    // and are mandatory for the localization algorithm (TopoMono/FireTri).
+    @SerializedName("altitude") val altitude: Double,
+    @SerializedName("heading") val heading: Float,
+    @SerializedName("pitch") val pitch: Float,
+    @SerializedName("verticalFov") val verticalFov: Float,
+    @SerializedName("horizontalFov") val horizontalFov: Float,
+
+    // Accuracy is optional sensor data, safe to keep as nullable.
+    @SerializedName("accuracy") val accuracy: Float? = null
 )
 
-// Used within DetectResponse (represents one detected object by cloud)
+/**
+ * Represents a single detection result returned by the cloud's ONNX model.
+ */
 data class DetectionResult(
-    @SerializedName("class_id") val classId: Int, // Matching your original naming
+    @SerializedName("class_id") val classId: Int,
     @SerializedName("confidence") val confidence: Float,
-    @SerializedName("box_normalized") val boxNormalized: List<Float> // [l,t,r,b] matching your original naming
+    @SerializedName("box_normalized") val boxNormalized: List<Float>
 )
+
+// NOTE: Removed legacy models (FireAlertData, LocationModel, MetadataModel) for simplicity.
+// Re-add them if they are used by other API endpoints or internal components.

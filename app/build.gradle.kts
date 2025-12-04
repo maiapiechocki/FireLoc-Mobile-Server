@@ -1,8 +1,4 @@
 plugins {
-    // Keep using aliases here if they work, otherwise use full plugin IDs
-    // Example: id("com.android.application")
-    // Example: id("kotlin-android")
-    // Example: id("com.google.gms.google-services")
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinAndroid)
     alias(libs.plugins.googleGmsServices)
@@ -73,24 +69,24 @@ android {
 }
 
 // ========================================================================
-//                        DEPENDENCIES BLOCK (REPLACED ALIASES)
+//                        DEPENDENCIES BLOCK (UPDATED)
 // ========================================================================
 dependencies {
     // Define versions (adjust as necessary or get from your libs.versions.toml)
     val coreKtxVersion = "1.13.1"
     val appcompatVersion = "1.7.0"
     val constraintlayoutVersion = "2.1.4"
-    val firebaseBomVersion = "33.1.0" // Use the latest BOM
+    val firebaseBomVersion = "33.1.0"
     val playServicesAuthVersion = "21.2.0"
-    val playServicesLocationVersion = "21.3.0" // Direct version for location
-    val retrofitVersion = "2.11.0" // Example version, use your intended one
-    val retrofitGsonConverterVersion = "2.11.0" // Should match retrofit
-    val okhttpLoggingVersion = "4.12.0" // Example version
-    val coroutinesVersion = "1.8.1" // Example version for coroutines core & play
-    val cameraxVersion = "1.3.3" // Example version
-    val lifecycleVersion = "2.8.1" // Example version
-    val activityKtxVersion = "1.9.0" // Example version
-    val onnxRuntimeVersion = "1.18.0" // Example version
+    val playServicesLocationVersion = "21.3.0"
+    val retrofitVersion = "2.11.0"
+    val retrofitGsonConverterVersion = "2.11.0"
+    val okhttpLoggingVersion = "4.12.0"
+    val coroutinesVersion = "1.8.1"
+    val cameraxVersion = "1.3.3" // This version must be consistent for all CameraX modules
+    val lifecycleVersion = "2.8.1"
+    val activityKtxVersion = "1.9.0"
+    val onnxRuntimeVersion = "1.18.0"
     val junitVersion = "4.13.2"
     val androidxJunitVersion = "1.1.5"
     val espressoVersion = "3.5.1"
@@ -102,30 +98,32 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:$constraintlayoutVersion")
 
     // --- Firebase ---
-    implementation(platform("com.google.firebase:firebase-bom:$firebaseBomVersion")) // Use BOM directly
-    implementation("com.google.firebase:firebase-auth-ktx")    // Auth
-    implementation("com.google.firebase:firebase-analytics-ktx") // Optional: Analytics
+    implementation(platform("com.google.firebase:firebase-bom:$firebaseBomVersion"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
 
-    // --- Firebase App Check ---
-    implementation("com.google.firebase:firebase-appcheck-ktx") // Base
-    implementation("com.google.firebase:firebase-appcheck-playintegrity") // Play Integrity Provider
-    implementation("com.google.firebase:firebase-appcheck-debug") // Debug Provider
+    // *** NEW/VERIFIED: Firebase App Check (Required by CloudVerificationService.kt) ***
+    implementation("com.google.firebase:firebase-appcheck-ktx")
+    implementation("com.google.firebase:firebase-appcheck-playintegrity")
+    implementation("com.google.firebase:firebase-appcheck-debug")
 
-    // --- Google Play Services ---
-    implementation("com.google.android.gms:play-services-auth:$playServicesAuthVersion")   // Google Sign-In
-    implementation("com.google.android.gms:play-services-location:$playServicesLocationVersion") // <<<< LOCATION (Directly specified)
+    // --- Google Play Services (Required by SensorFusionManager.kt) ---
+    implementation("com.google.android.gms:play-services-auth:$playServicesAuthVersion")
+    implementation("com.google.android.gms:play-services-location:$playServicesLocationVersion")
 
     // --- Networking ---
-    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")             // Retrofit
-    implementation("com.squareup.retrofit2:converter-gson:$retrofitGsonConverterVersion") // Gson converter
-    implementation("com.squareup.okhttp3:logging-interceptor:$okhttpLoggingVersion") // OkHttp logging
+    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
+    implementation("com.squareup.retrofit2:converter-gson:$retrofitGsonConverterVersion")
+    implementation("com.squareup.okhttp3:logging-interceptor:$okhttpLoggingVersion")
 
-    // --- Coroutines ---
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion") // Base
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:$coroutinesVersion") // For await()
+    // --- Coroutines (Required by SensorFusionManager.kt and CloudVerificationService.kt for 'await()') ---
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
+    // This library provides the .await() extension function for Firebase Tasks
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:$coroutinesVersion")
 
-    // --- CameraX ---
+    // --- CameraX (Required for CameraManager.kt and Camera2CameraInfo) ---
     implementation("androidx.camera:camera-core:$cameraxVersion")
+    // *** CRITICAL FIX: The interop library needed for Camera2CameraInfo ***
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
@@ -135,7 +133,7 @@ dependencies {
     implementation("androidx.activity:activity-ktx:$activityKtxVersion")
 
     // --- ONNX Runtime ---
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:$onnxRuntimeVersion") // Use specific version
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:$onnxRuntimeVersion")
 
     // --- Testing ---
     testImplementation("junit:junit:$junitVersion")
