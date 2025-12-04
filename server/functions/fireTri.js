@@ -1,8 +1,8 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
 
+// Note: Ensure this URL is accessible from Firebase Functions (e.g., use ngrok for local dev, or the real Cloud Run URL for prod)
 const PYTHON_LOCALIZATION_URL = 'https://jimmy-sobersided-carson.ngrok-free.dev/localize'; 
-
 const DEM_TIFF_PATH = 'USGS_one_meter_x36y378_CA_LosAngeles_2016.tif';
 
 async function writeFireAlert(fireId, locationData) {
@@ -10,6 +10,7 @@ async function writeFireAlert(fireId, locationData) {
     const lat = Number(locationData.lat) || 0;
     const lon = Number(locationData.lon) || 0;
     
+    // Matches Screenshot Collection "FireAlerts"
     const fireAlertRef = db.collection('FireAlerts').doc(fireId);
     const geoPoint = new admin.firestore.GeoPoint(lat, lon);
 
@@ -26,18 +27,21 @@ async function writeFireAlert(fireId, locationData) {
 }
 
 async function runLocalizationOrchestrator(singleLocation, boundingBox, deviceId, detectionMetadata) {
-    console.log(`[Orchestrator] Starting for device: ${deviceId}`);
-
-    // Validate inputs to prevent crashes
     if (!detectionMetadata) detectionMetadata = {};
 
+    // *** CHANGED: Added FOV fields to payload ***
     const singleDetection = {
         cameraId: deviceId,
         lat: singleLocation.latitude,
         lon: singleLocation.longitude,
         elevation: detectionMetadata.elevation || 0,
+        // These are now TRUE NORTH headings from Android
         heading: detectionMetadata.heading || 0,
         pitch: detectionMetadata.pitch || 0,
+        // *** NEW: Pass FOV to Python for Ray Casting ***
+        verticalFov: detectionMetadata.verticalFov || 45.0,   // Default approx if missing
+        horizontalFov: detectionMetadata.horizontalFov || 60.0, // Default approx if missing
+        // Bounding box
         xmin: boundingBox[0],
         ymin: boundingBox[1],
         xmax: boundingBox[2],
@@ -51,18 +55,16 @@ async function runLocalizationOrchestrator(singleLocation, boundingBox, deviceId
     };
     
     try {
-        console.log(`[Orchestrator] Calling Python at: ${PYTHON_LOCALIZATION_URL}`);
+        console.log(`[Orchestrator] Sending payload to Python:`, JSON.stringify(ensemblePayload));
         
         const response = await axios.post(PYTHON_LOCALIZATION_URL, ensemblePayload, {
-            timeout: 60000 // 60s timeout for heavy math
+            timeout: 60000 
         });
 
         const finalLocation = response.data;
 
-        // Verify we got valid coordinates back
         if (finalLocation && typeof finalLocation.lat === 'number') {
             const fireId = `fire_${deviceId}`; 
-            // Keep original confidence if Python didn't generate a new one
             finalLocation.confidence = finalLocation.confidence || detectionMetadata.confidence;
             
             await writeFireAlert(fireId, finalLocation);
@@ -78,5 +80,4 @@ async function runLocalizationOrchestrator(singleLocation, boundingBox, deviceId
     }
 }
 
-// Export the function so index.js can use it
 module.exports = { runLocalizationOrchestrator };

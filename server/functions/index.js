@@ -8,24 +8,28 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 
 // Initialize Firebase Admin SDK *ONCE*
-admin.initializeApp();
-console.log("Firebase Admin SDK Initialized."); 
+// We check apps.length to prevent "App already initialized" errors during hot reloads or tests
+if (!admin.apps.length) {
+    admin.initializeApp();
+    console.log("Firebase Admin SDK Initialized."); 
+}
 
-// --- 1. Register Device Function (EXISTING) ---
+// --- 1. Register Device Function ---
 // Import the specific handler function from registerDevice.js
+// Ensure registerDevice.js exists and exports a function (module.exports = ...)
 const registerDeviceHandler = require("./registerDevice");
 exports.registerDevice = functions.https.onRequest(registerDeviceHandler);
-console.log("Exported 'registerDevice' function.");
 
-// --- 2. Detect Function (EXISTING) ---
+// --- 2. Detect Function ---
 // Import the specific handler function from detect.js
+// NOTE: detect.js now uses lazy loading for heavy libraries (sharp, onnx) to prevent timeouts
 const detectHandler = require("./detect");
 exports.detect = functions.https.onRequest(detectHandler);
-console.log("Exported 'detect' function.");
 
 // --- 3. Process Fire Alert Function (NEW LOCALIZATION SYSTEM) ---
-// Import the orchestrator from firetri.js
-const { runLocalizationOrchestrator } = require('./firetri');
+// Import the orchestrator from fireTri.js
+// **IMPORTANT:** Check capitalization. Linux servers are case-sensitive!
+const { runLocalizationOrchestrator } = require('./fireTri');
 
 exports.processFireAlert = functions.https.onRequest(async (req, res) => {
     try {
@@ -59,4 +63,3 @@ exports.processFireAlert = functions.https.onRequest(async (req, res) => {
         res.status(500).send({ error: error.message });
     }
 });
-console.log("Exported 'processFireAlert' function.");
