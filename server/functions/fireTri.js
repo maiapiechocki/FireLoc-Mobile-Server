@@ -1,164 +1,83 @@
-const { getElevation } = require("./dem_utils");
-const math = require("mathjs");
-const proj4 = require("proj4");
+const axios = require('axios');
+const admin = require('firebase-admin');
 
-// ---------------------------
-// Helper: Dot Product
-// ---------------------------
-function dot(a, b) {
-    return a.reduce((sum, val, i) => sum + val * b[i], 0);
+// Note: Ensure this URL is accessible from Firebase Functions (e.g., use ngrok for local dev, or the real Cloud Run URL for prod)
+const PYTHON_LOCALIZATION_URL = 'https://jimmy-sobersided-carson.ngrok-free.dev/localize'; 
+const DEM_TIFF_PATH = 'USGS_one_meter_x36y378_CA_LosAngeles_2016.tif';
+
+async function writeFireAlert(fireId, locationData) {
+    const db = admin.firestore();
+    const lat = Number(locationData.lat) || 0;
+    const lon = Number(locationData.lon) || 0;
+    
+    // Matches Screenshot Collection "FireAlerts"
+    const fireAlertRef = db.collection('FireAlerts').doc(fireId);
+    const geoPoint = new admin.firestore.GeoPoint(lat, lon);
+
+    await fireAlertRef.set({
+        location: geoPoint,
+        elevation: locationData.elevation || 0,
+        confidence: locationData.confidence || 0,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        method: locationData.method || 'Unknown',
+        status: 'active'
+    }, { merge: true });
+
+    console.log(`[Firestore] FireAlert written: ${fireId} -> [${lat}, ${lon}]`);
 }
 
-// ---------------------------
-// Rotation Matrix
-// from Yaw-Pitch-Roll (ZYX order)
-// ---------------------------
-function getRotationMatrix([yaw, pitch, roll]) {
-    const deg2rad = angle => (angle * Math.PI) / 180;
-    yaw = deg2rad(yaw);
-    pitch = deg2rad(pitch);
-    roll = deg2rad(roll);
+async function runLocalizationOrchestrator(singleLocation, boundingBox, deviceId, detectionMetadata) {
+    if (!detectionMetadata) detectionMetadata = {};
 
-    const cy = Math.cos(yaw), sy = Math.sin(yaw);
-    const cp = Math.cos(pitch), sp = Math.sin(pitch);
-    const cr = Math.cos(roll), sr = Math.sin(roll);
+    // *** CHANGED: Added FOV fields to payload ***
+    const singleDetection = {
+        cameraId: deviceId,
+        lat: singleLocation.latitude,
+        lon: singleLocation.longitude,
+        elevation: detectionMetadata.elevation || 0,
+        // These are now TRUE NORTH headings from Android
+        heading: detectionMetadata.heading || 0,
+        pitch: detectionMetadata.pitch || 0,
+        // *** NEW: Pass FOV to Python for Ray Casting ***
+        verticalFov: detectionMetadata.verticalFov || 45.0,   // Default approx if missing
+        horizontalFov: detectionMetadata.horizontalFov || 60.0, // Default approx if missing
+        // Bounding box
+        xmin: boundingBox[0],
+        ymin: boundingBox[1],
+        xmax: boundingBox[2],
+        ymax: boundingBox[3],
+        confidence: detectionMetadata.confidence || 0
+    };
 
-    return [
-        [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
-        [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
-        [-sp, cp * sr, cp * cr]
-    ];
-}
+    const ensemblePayload = {
+        detections: [singleDetection], 
+        dem_path: DEM_TIFF_PATH,
+    };
+    
+    try {
+        console.log(`[Orchestrator] Sending payload to Python:`, JSON.stringify(ensemblePayload));
+        
+        const response = await axios.post(PYTHON_LOCALIZATION_URL, ensemblePayload, {
+            timeout: 60000 
+        });
 
-// ---------------------------
-// Project Pixel to 3D Ray
-// ---------------------------
-function computeRayFromPixel(pixel, intrinsics, orientation, location) {
-    const [width, height] = intrinsics.resolution;
-    const fov = intrinsics.fov;
-    const fx = width / (2 * Math.tan((fov * Math.PI) / 360));
-    const fy = fx;
-    const cx = width / 2;
-    const cy = height / 2;
+        const finalLocation = response.data;
 
-    const [x_img, y_img] = pixel;
-    const xn = (x_img - cx) / fx;
-    const yn = (y_img - cy) / fy;
-    const zn = 1.0;
-
-    let ray_camera = [xn, yn, zn];
-    const norm = Math.sqrt(ray_camera.reduce((acc, val) => acc + val * val, 0));
-    ray_camera = ray_camera.map(v => v / norm);
-
-    const R = getRotationMatrix(orientation);
-
-    const ray_world = [
-        dot(R[0], ray_camera),
-        dot(R[1], ray_camera),
-        dot(R[2], ray_camera)
-    ];
-
-    const ray_world_norm = Math.sqrt(dot(ray_world, ray_world));
-    const normalized_ray = ray_world.map(v => v / ray_world_norm);
-
-    return [location, normalized_ray];
-}
-
-// ---------------------------
-// Triangulate Between Two Rays
-// ---------------------------
-function triangulateTwoRays(origin1, dir1, origin2, dir2) {
-    const w0 = origin1.map((val, i) => val - origin2[i]);
-    const a = dot(dir1, dir1);
-    const b = dot(dir1, dir2);
-    const c = dot(dir2, dir2);
-    const d = dot(dir1, w0);
-    const e = dot(dir2, w0);
-
-    const denom = a * c - b * b;
-    if (denom === 0) return null;
-
-    const t = (b * e - c * d) / denom;
-    const s = (a * e - b * d) / denom;
-
-    const point1 = origin1.map((val, i) => val + t * dir1[i]);
-    const point2 = origin2.map((val, i) => val + s * dir2[i]);
-
-    const midpoint = point1.map((val, i) => (val + point2[i]) / 2);
-    return midpoint;
-}
-
-// ---------------------------
-// RANSAC-style Average
-// ---------------------------
-function ransacAverage(points, threshold = 5.0) {
-    if (points.length <= 2) {
-        return math.mean(points, 0);
-    }
-
-    const centroid = math.mean(points, 0);
-    const distances = points.map(p => math.distance(p, centroid));
-    const inliers = points.filter((_, i) => distances[i] < threshold);
-
-    if (inliers.length === 0) return centroid;
-    return math.mean(inliers, 0);
-}
-
-// ---------------------------
-// Main FireTri Localizer
-// ---------------------------
-function firetriLocalize(cameras, demDataset = null, ransacThreshold = 5.0, transformer = null) {
-    const rays = [];
-
-    for (const cam of cameras) {
-        const [origin, direction] = computeRayFromPixel(
-            cam.fire_pixel,
-            cam.intrinsics,
-            cam.orientation,
-            cam.location
-        );
-        rays.push([origin, direction]);
-    }
-
-    const points = [];
-    for (let i = 0; i < rays.length; i++) {
-        for (let j = i + 1; j < rays.length; j++) {
-            const point = triangulateTwoRays(...rays[i], ...rays[j]);
-            if (point) points.push(point);
+        if (finalLocation && typeof finalLocation.lat === 'number') {
+            const fireId = `fire_${deviceId}`; 
+            finalLocation.confidence = finalLocation.confidence || detectionMetadata.confidence;
+            
+            await writeFireAlert(fireId, finalLocation);
+            return finalLocation;
+        } else {
+            console.warn("[Orchestrator] Python returned invalid data:", finalLocation);
+            return null;
         }
+
+    } catch (error) {
+        console.error("[Orchestrator] Localization request failed:", error.message);
+        return null; 
     }
-
-    if (points.length === 0) {
-        console.log("No valid triangulated points found.");
-        return null;
-    }
-
-    let finalLocation = ransacAverage(points, ransacThreshold);
-    console.log("Raw triangulated fire position (x, y, z):", finalLocation);
-
-    // DEM correction
-    if (demDataset && transformer) {
-        const [x, y] = finalLocation;
-
-        try {
-            const [lon, lat] = transformer.inverse([x, y]);
-            console.log(`Transformed to lat/lon: (${lat}, ${lon})`);
-
-            const demZ = getElevation(lat, lon, demDataset);
-            console.log(`Elevation from DEM at (${lat}, ${lon}): ${demZ}`);
-            finalLocation[2] = demZ;
-        } catch (err) {
-            console.warn("DEM correction failed:", err.message);
-        }
-    }
-
-    return finalLocation;
 }
 
-module.exports = {
-    firetriLocalize,
-    triangulateTwoRays,
-    computeRayFromPixel,
-    ransacAverage,
-    getRotationMatrix
-};
+module.exports = { runLocalizationOrchestrator };

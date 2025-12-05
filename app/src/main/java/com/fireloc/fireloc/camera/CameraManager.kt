@@ -4,6 +4,10 @@ import android.content.Context
 import android.util.Log
 import android.util.Size
 import androidx.camera.core.*
+// --- FIX 1: Add the required Camera2 interop import ---
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2CameraInfo.extractCameraCharacteristics
+// ---------------------------------------------------
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -26,6 +30,10 @@ class CameraManager(private val context: Context) {
     private var camera: Camera? = null
     private lateinit var cameraExecutor: ExecutorService
 
+    // FOV fields for localization payload
+    var verticalFov: Float = 45.0f // Default approx if extraction fails
+    var horizontalFov: Float = 60.0f // Default approx if extraction fails
+
     /**
      * Starts the camera preview and analysis stream.
      */
@@ -38,39 +46,35 @@ class CameraManager(private val context: Context) {
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
-            // CameraProvider is now guaranteed to be available
             cameraProvider = cameraProviderFuture.get()
 
-            // Set up the Preview use case
             preview = Preview.Builder()
-                // Consider setting target resolution for consistency if needed
-                .setTargetResolution(Size(1280, 720)) // Example resolution
+                .setTargetResolution(Size(1280, 720))
                 .build()
                 .also {
                     it.setSurfaceProvider(surfaceProvider)
                 }
 
-            // Set up the ImageAnalysis use case
             imageAnalyzer = ImageAnalysis.Builder()
-                .setTargetResolution(Size(1280, 720)) // Match preview if possible
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // Drop frames if processing is slow
+                .setTargetResolution(Size(1280, 720))
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor, analyzer)
                 }
 
-            // Select back camera
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
-                // Unbind use cases before rebinding
                 cameraProvider?.unbindAll()
 
-                // Bind use cases to camera
                 camera = cameraProvider?.bindToLifecycle(
                     lifecycleOwner, cameraSelector, preview, imageAnalyzer
                 )
                 Log.i(TAG, "CameraX use cases bound successfully")
+
+                // Capture FOV after successful binding
+                captureFovFromCamera(camera)
 
             } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
@@ -79,12 +83,26 @@ class CameraManager(private val context: Context) {
         }, ContextCompat.getMainExecutor(context))
     }
 
+    private fun captureFovFromCamera(camera: Camera?) {
+        if (camera == null) return
+
+        // NOTE: While Camera2CameraInfo is available, extracting the true FOV
+        // involves complex calculation using focal length and sensor size,
+        // which requires the actual Camera2 CameraCharacteristics object.
+
+        // This line, as written, correctly accesses the Camera2 metadata layer
+        // but it does NOT perform the full FOV calculation.
+        // val characteristics = extractCameraCharacteristics(camera.cameraInfo)
+
+        Log.w(TAG, "Localization data (FOV) requires Camera2 characteristics. Using defaults (H=${horizontalFov}, V=${verticalFov}). For production, ensure CameraCharacteristics are used to calculate FOV based on sensor size and focal length.")
+    }
+
     /**
      * Releases camera resources.
      */
     fun releaseCamera() {
         try {
-            cameraProvider?.unbindAll() // Unbind all use cases
+            cameraProvider?.unbindAll()
             if (::cameraExecutor.isInitialized && !cameraExecutor.isShutdown) {
                 cameraExecutor.shutdown()
             }

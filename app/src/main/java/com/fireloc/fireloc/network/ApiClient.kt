@@ -10,7 +10,7 @@ object ApiClient {
 
     // We need a dummy base URL for Retrofit builder, even if we use @Url in ApiService
     // Use a placeholder, it won't actually be used for requests with @Url.
-    private const val DUMMY_BASE_URL = "http://localhost/" // Placeholder
+    private const val DUMMY_BASE_URL = "https://placeholder-fireloc.com/" // Placeholder
 
     val instance: ApiService by lazy {
         createRetrofit().create(ApiService::class.java)
